@@ -92,10 +92,15 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
+          /************************************************************
+          ******************** IMPLEMENTATION *************************
+          ************************************************************/
+          
+          // STEP 1: convert x and y to VectorXd
           Eigen::VectorXd ptsx_vector = Eigen::VectorXd::Map(ptsx.data(), 6);
           Eigen::VectorXd ptsy_vector = Eigen::VectorXd::Map(ptsy.data(), 6);
 
-          // converting coordinates, car reference
+          // STEP 2: transform to vehicle coordinates
           for (int i = 0; i < ptsx_vector.size(); i++) {
             double x = ptsx_vector[i]-px;
             double y = ptsy_vector[i]-py;
@@ -103,41 +108,55 @@ int main() {
             ptsy_vector[i] = x * sin(0-psi) + y * cos(0-psi);
           }
 
-          // Third degree polynomial -> coeffs
+          // STEP 3: fit a third degree polynomial to estimate error
           auto coeffs = polyfit(ptsx_vector, ptsy_vector, 3);
-
           //caculate cte and epsi
           double cte = polyeval(coeffs, 0);
           double epsi = -atan(coeffs[1]);
 
-          double steer_value = j[1]["steering_angle"];
-          double throttle_value = j[1]["throttle"];
-
-          int dt = 0; // -> 100ms at least
-          const double Lf = 2.67;
-
-          //apply the formula (dt)
-          double st_x = v*dt;
-          double st_y = 0;
-          double st_psi = -v*steer_value / Lf * dt;
-          double st_v = v + throttle_value*dt;
-          double st_cte = cte + v*sin(epsi)*dt;
-          double st_epsi = epsi-v*steer_value /Lf * dt;
-
-          // state
+          // STEP 4: Form the current state vector and Solve
           Eigen::VectorXd state(6);
-          state << st_x, st_y, st_psi, st_v, st_cte, st_epsi;
-
+          state << 0, 0, 0, v, cte, epsi;
           // mpc
           auto x1 = mpc.Solve(state, coeffs);
+          double steer_value = x1[0];
+          double throttle_value = x1[1];
 
+          // STEP 5: Update waypoints
+          vector<double> next_x;
+          vector<double> next_y;
+          next_x.resize(ptsx_vector.size());
+          next_y.resize(ptsy_vector.size());
+          vector<double> mpc_x;
+          vector<double> mpc_y;
+
+          // Next point
+          for (int i = 0; i < ptsx_vector.size(); i++) {
+            next_x[i] = ptsx_vector[i];
+            next_y[i] = ptsy_vector[i];
+          }
+
+          // MPC
+          for (int i = 2; i < x1.size(); i++) {
+            if(i%2 == 0){
+              mpc_x.push_back(x1[i]);
+            } else {
+              mpc_y.push_back(x1[i]);
+            }
+          }
+
+          // sending values in json format
           json msgJson;
-          msgJson["steering_angle"] = x1[0];
-          msgJson["throttle"] = x1[1];
-          msgJson["next_x"] = "";
-          msgJson["next_y"] = "";
-          msgJson["mpc_x"] = "";
-          msgJson["mpc_y"] = "";
+          msgJson["steering_angle"] = steer_value;
+          msgJson["throttle"] = throttle_value;
+          msgJson["next_x"] = next_x;
+          msgJson["next_y"] = next_y;
+          msgJson["mpc_x"] = mpc_x;
+          msgJson["mpc_y"] = mpc_y;
+
+          /************************************************************
+          ******************** ./IMPLEMENTATION ***********************
+          ************************************************************/
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           //std::cout << msg << std::endl;
@@ -150,7 +169,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(dt));
+          this_thread::sleep_for(chrono::milliseconds(100));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {

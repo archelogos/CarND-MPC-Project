@@ -5,16 +5,16 @@
 
 using CppAD::AD;
 
-size_t N = 10;
-double dt = 0.1;
+size_t N = 20;
+double dt = 0.20;
 
-int cost_cte_factor = 1000;
-int cost_epsi_factor = 1000;
+int cost_cte_factor = 2000;
+int cost_epsi_factor = 2000;
 int cost_v_factor = 1;
-int cost_initial_delta_factor = 10;
-int cost_initial_a_factor = 10;
-int cost_diff_delta_factor = 200;
-int cost_diff_a_factor = 20;
+int cost_current_delta_factor = 100;
+int cost_current_a_factor = 10;
+int cost_diff_delta_factor = 100;
+int cost_diff_a_factor = 10;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -30,7 +30,7 @@ const double Lf = 2.67;
 
 double ref_cte = 0;
 double ref_epsi = 0;
-double ref_v = 100;
+double ref_v = 70;
 
 size_t x_start = 0;
 size_t y_start = x_start + N;
@@ -60,8 +60,8 @@ class FG_eval {
     }
 
     for (int i = 0; i < N - 1; i++) {
-      fg[0] += cost_initial_delta_factor*CppAD::pow(vars[delta_start + i], 2);
-      fg[0] += cost_initial_a_factor*CppAD::pow(vars[a_start + i], 2);
+      fg[0] += cost_current_delta_factor*CppAD::pow(vars[delta_start + i], 2);
+      fg[0] += cost_current_a_factor*CppAD::pow(vars[a_start + i], 2);
     }
 
     for (int i = 0; i < N - 2; i++) {
@@ -232,11 +232,13 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   auto cost = solution.obj_value;
   //std::cout << "Cost " << cost << std::endl;
 
-  // TODO: Return the first actuator values. The variables can be accessed with
-  // `solution.x[i]`.
-  //
-  // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
-  // creates a 2 element double vector.
-  auto x1 = {solution.x[delta_start], solution.x[a_start]};
+  vector<double> x1;
+  x1.push_back(solution.x[delta_start]);
+  x1.push_back(solution.x[a_start]);
+  for (int i = 0; i < N-1; i++)
+  {
+    x1.push_back(solution.x[x_start + i + 1]);
+    x1.push_back(solution.x[y_start + i + 1]);
+  }
   return x1;
 }
