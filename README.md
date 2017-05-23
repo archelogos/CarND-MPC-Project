@@ -3,6 +3,55 @@ Self-Driving Car Engineer Nanodegree Program
 
 ---
 
+## MPC
+
+For this project we have implemented a global kinematic model which represents the vehicle state model by position, orientation and velocity.
+
+The main goal was to use the mentioned MPC (Model Predictive Controller) to safely drive a car along the track. The key point in this project was to choose the appropiate parameter values that optimize the MPC cost function.
+
+In addition to the variables mentioned before, others parameters were taken into account to define the MPC pipeline.
+
+- The CTE (cross track error) represents the distance of the vehicle from the trajectory.
+- EPSI (orientation error) which describes the difference between the vehicle orientation and the trajectory orientation.
+
+Two actuators were also used to solve the MPC
+
+- delta -> the steering angle
+- a -> the acceleration value (can be negative or positive)
+
+![Screen](./screen.jpeg)
+
+## MAIN PIPELINE
+
+The main pipeline receives the next waypoints that the vehicle should drive at. It transforms the coordinates to vehicle-centered ones and fits a third degree polynomial with these values. With the resulting coefficients, it was possible to estimate the CTE and EPSI errors.
+
+Positioning the vehicle in the ideally initial state (0,0,0) and using also the given speed and the calculated CTE and EPSI, it was possible to form the state which was passed to the MPC solve function. It returned the new steering and acceleration values.
+
+In order to achieve the main goal of this project and to drive the vehicle safely and smootly into the track lanes, we needed to tune the cost function factors as follows.
+
+The following values were chosen as hyperparameters.
+
+```C++
+size_t N = 20;
+double dt = 0.20;
+
+int cost_cte_factor = 2000;
+int cost_epsi_factor = 2000;
+int cost_v_factor = 1;
+int cost_current_delta_factor = 100;
+int cost_current_a_factor = 10;
+int cost_diff_delta_factor = 100;
+int cost_diff_a_factor = 10;
+
+double ref_cte = 0;
+double ref_epsi = 0;
+double ref_v = 70;
+```
+
+To accomplish the 100ms delay requirement, it was set a value of 20 for N and 0.2s for dt in order to have a
+better and greater predictive estimation. It was also set a max speed value of 70mph to avoid very high speed situations.
+
+
 ## Dependencies
 
 * cmake >= 3.5
@@ -22,7 +71,7 @@ Self-Driving Car Engineer Nanodegree Program
   * Mac: `brew install ipopt --with-openblas`
   * Linux
     * You will need a version of Ipopt 3.12.1 or higher. The version available through `apt-get` is 3.11.x. If you can get that version to work great but if not there's a script `install_ipopt.sh` that will install Ipopt. You just need to download the source from [here](https://github.com/coin-or/Ipopt/releases).
-    * Then call `install_ipopt.sh` with the source directory as the first argument, ex: `bash install_ipopt.sh Ipopt-3.12.1`. 
+    * Then call `install_ipopt.sh` with the source directory as the first argument, ex: `bash install_ipopt.sh Ipopt-3.12.1`.
   * Windows: TODO. If you can use the Linux subsystem and follow the Linux instructions.
 * [CppAD](https://www.coin-or.org/CppAD/)
   * Mac: `brew install cppad`
